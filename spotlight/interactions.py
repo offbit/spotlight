@@ -245,6 +245,8 @@ class Interactions(object):
 
         sequences = np.zeros((num_subsequences, max_sequence_length),
                              dtype=np.int32)
+        sequence_lengths = np.zeros(num_subsequences,
+                             dtype=np.int32)
         sequence_users = np.empty(num_subsequences,
                                   dtype=np.int32)
         for i, (uid,
@@ -254,14 +256,17 @@ class Interactions(object):
                                                       max_sequence_length,
                                                       step_size)):
             sequences[i][-len(seq):] = seq
+            sequence_lengths[i]  = len(seq)
             sequence_users[i] = uid
 
         if min_sequence_length is not None:
             long_enough = sequences[:, -min_sequence_length] != 0
             sequences = sequences[long_enough]
             sequence_users = sequence_users[long_enough]
+            sequence_lengths = sequence_lengths[long_enough]
 
         return (SequenceInteractions(sequences,
+                                     sequence_lengths,
                                      user_ids=sequence_users,
                                      num_items=self.num_items))
 
@@ -289,9 +294,12 @@ class SequenceInteractions(object):
 
     def __init__(self,
                  sequences,
-                 user_ids=None, num_items=None):
+                 sequence_lengths, 
+                 user_ids=None, 
+                 num_items=None):
 
         self.sequences = sequences
+        self.sequence_lengths = sequence_lengths
         self.user_ids = user_ids
         self.max_sequence_length = sequences.shape[1]
 

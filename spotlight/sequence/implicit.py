@@ -200,6 +200,7 @@ class ImplicitSequenceModel(object):
         """
 
         sequences = interactions.sequences.astype(np.int64)
+        sequence_lengths = interactions.sequence_lengths.astype(np.int64)
 
         if not self._initialized:
             self._initialize(interactions)
@@ -208,23 +209,30 @@ class ImplicitSequenceModel(object):
 
         for epoch_num in range(self._n_iter):
 
-            sequences = shuffle(sequences,
+            sequences, lengths = shuffle(sequences, sequence_lengths,
                                 random_state=self._random_state)
 
             sequences_tensor = gpu(torch.from_numpy(sequences),
                                    self._use_cuda)
+            lengths_tensor = gpu(torch.from_numpy(lengths),
+                                   self._use_cuda)
 
             epoch_loss = 0.0
 
-            for minibatch_num, batch_sequence in enumerate(minibatch(sequences_tensor,
+            for minibatch_num, (batch_sequence, batch_lengths) in enumerate(minibatch(sequences_tensor, lengths_tensor,
                                                                      batch_size=self._batch_size)):
+
+                _, ids_sorted = batch_lengths.sort(dim=0, descending=True)
+                
+                batch_sequence = batch_sequence[ids_sorted]
+                batch_lengths = batch_lengths[ids_sorted]
 
                 sequence_var = Variable(batch_sequence)
 
                 user_representation, _ = self._net.user_representation(
                     sequence_var
                 )
-
+                print('positive prediction. varsize :{}'.format(sequence_var.size()))
                 positive_prediction = self._net(user_representation,
                                                 sequence_var)
 
@@ -262,6 +270,8 @@ class ImplicitSequenceModel(object):
         negative_var = Variable(
             gpu(torch.from_numpy(negative_items), self._use_cuda)
         )
+        print('negative prediction. varsize :{}'.format(negative_var.size()))
+        
         negative_prediction = self._net(user_representation, negative_var)
 
         return negative_prediction
